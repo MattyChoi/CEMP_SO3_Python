@@ -6,9 +6,11 @@
 # Input Parameters: 
 # n: the number of the graph nodes
 # p: the probability of connecting a pair of vertices. G([n],E) is Erdos-Renyi graph G(n,p).
-# q: the probability of corrupting an edge
-# sigma: the noise level (>0)
-# crpt_type (optional): choose 'uniform' or 'self-consistent'. The default choice is 'uniform'.
+# p_node_crpt: the probability of corrupting a node
+# p_node_edge: the probability of corrupting an edge
+# sigma_in: the noise level for inliers
+# sigma_out: the noise level for outliers
+# crpt_type (optional): choose 'uniform' or 'self-consistent', or 'adv'. The default choice is 'uniform'.
 
 # Output:
 # out.AdjMat: n by n adjacency matrix of the generated graph
@@ -21,7 +23,6 @@
 # [1] Yunpeng Shi and Gilad Lerman. "Message Passing Least Squares Framework and its Application to Rotation Synchronization" ICML 2020.
 
 import numpy as np
-import numpy.linalg as LA
 from helpers import *
 
 class SyntheticGraph:
@@ -33,7 +34,7 @@ class SyntheticGraph:
         self.R_orig = R_orig
         self.ErrVec = ErrVec
 
-def Uniform_Topology_SO3(n, p, q, sigma, crpt_type='uniform'):
+def Nonuniform_Topology_SO3(n, p, p_node_crpt, p_edge_crpt, sigma_in, sigma_out, crpt_type='uniform'):
     ### create an adjacency matrix
 
     # create random edges
@@ -52,6 +53,9 @@ def Uniform_Topology_SO3(n, p, q, sigma, crpt_type='uniform'):
     # matrix of size edge_num by 2, each row has the i, j coordinates of each edge
     Ind = np.array([Ind_i, Ind_j]).T
 
+    # create a matrix of indicies
+    Ind_full = np.transpose([np.concatenate((Ind_j, Ind_i)), np.concatenate((Ind_i, Ind_j))])
+
     ### generate rotation matrices
     R_orig = generate_rotations(n)
 
@@ -59,51 +63,67 @@ def Uniform_Topology_SO3(n, p, q, sigma, crpt_type='uniform'):
     m = len(Ind_i)
 
     Rij_orig = np.zeros((3,3,m))
+    IndMat = np.zeros((n,n)).astype(int)
     for k in range(m):
-        i, j = Ind_i[k], Ind_j[k]; 
+        i, j = Ind_i[k], Ind_j[k] 
         Rij_orig[:,:,k] = R_orig[:,:,i] @ R_orig[:,:,j].T
+        IndMat[i,j] = k
+        IndMat[j,i] = -k
+    
+    # get the nodes which the corrupt edges will cluster around
+    node_crpt = np.random.permutation(n)
+    n_node_crpt = int(n * p_node_crpt)
+    node_crpt = node_crpt[:n_node_crpt]
+
+    crptInd = np.zeros(m).astype(bool)
+
+    # only used in self-consistend and adv
+    R_crpt = generate_rotations(n)
 
     ### Add noise to some of the rotations
 
     # create a matrix that stores the noisy and corrupt relative rotations
     RijMat = Rij_orig.copy()
 
-    # all edges are noisy or corrupt
-    noiseIndLog = np.random.rand(m) >= q
-    corrIndLog = ~noiseIndLog
+    for i in node_crpt:
+        neighbor_cand = Ind_full[Ind_full[:,0]==i, 1]
+        length = len(neighbor_cand)
+        neighbor_crpt = np.random.permutation(length)
+        n_neighbor = int(p_edge_crpt * length)
+        neighbor_crpt = neighbor_crpt[:n_neighbor]
+        neighbor_crpt = neighbor_cand[neighbor_crpt]
 
-    # get the integer indices
-    noiseInd= np.where(noiseIndLog)[0]
-    corrInd = np.where(corrIndLog)[0]
+        for j in neighbor_crpt:
+            k = IndMat[i,j]
+            crptInd[abs(k)] = True
 
-    # add the noise
-    RijMat[:,:,noiseInd] += sigma * np.random.randn(3, 3, len(noiseInd))
+            R0 = np.random.randn(3,3)
+            R0 = project_to_SO3(R0)
 
-    # project back to SO(3)
-    for k in noiseInd:
-        # use svd to get unitary 3x3 matrices
-        U, _, V = LA.svd(RijMat[:,:,k])
+            if str.lower(crpt_type) == 'uniform':
+                if k >= 0:
+                    RijMat[:,:,k] = R0
+                else:
+                    RijMat[:,:,-k] = R0.T
+            else:
+                if str.lower(crpt_type) == 'self-consistent':
+                    if k >= 0:
+                        RijMat[:,:,k] = R_crpt[:,:,i] @ R_crpt[:,:,j].T
+                    else:
+                        RijMat[:,:,-k] = R_crpt[:,:,j] @ R_crpt[:,:,i].T 
+                elif str.lower(crpt_type) == 'adv':
+                    if k >= 0:
+                        RijMat[:,:,k] = R_crpt[:,:,i] @ R_orig[:,:,j].T
+                    else:
+                        RijMat[:,:,-k] = R_crpt[:,:,j] @ R_orig[:,:,i].T
 
-        # email yunpeng about this line
-        S0 = np.diag([1, 1, LA.det(U @ V)]);  
-        RijMat[:,:,k] = U @ S0 @ V
-
-    if str.lower(crpt_type) == 'uniform':
-        for k in corrInd:
-            Q = np.random.randn(3,3)
-            RijMat[:,:,k] = project_to_SO3(Q)
-            
-    elif str.lower(crpt_type) == 'self-consistent':
-        # create corrupt absolute orientations
-        R_corr = generate_rotations(n)
-
-        # make corrupt relative rotations for the corrupt edges
-        for k in corrInd:
-            i, j = Ind_i[k], Ind_j[k]
-
-            # add noise to the corrupt rotations
-            Q = R_corr[:,:,i] @ R_corr[:,:,j].T + sigma * np.random.randn(3,3)
-            RijMat[:,:,k] = project_to_SO3(Q)
+    noiseInd = ~crptInd
+    # indices of corrupted edges
+    RijMat[:,:,noiseInd] += sigma_in * np.random.randn(3, 3, noiseInd.sum())
+    RijMat[:,:,crptInd] += sigma_out * np.random.randn(3, 3, crptInd.sum())
+    
+    # project all rotation matrices back to SO(3)
+    project_to_SO3_all(RijMat, m)
 
     R_err = np.zeros((3,m))
     for j in range(3):
@@ -111,8 +131,6 @@ def Uniform_Topology_SO3(n, p, q, sigma, crpt_type='uniform'):
 
     # added clipping because of some small floating point errors
     R_err_trace = np.clip(np.sum(R_err, axis=0), -1, 3)
-    ErrVec = abs(np.arccos((R_err_trace-1) / 2.0)) / np.pi; # computing geodesic distance from the ground truth
+    ErrVec = abs(np.arccos((R_err_trace-1) / 2.0)) / np.pi # computing geodesic distance from the ground truth
     
     return SyntheticGraph(AdjMat, Ind, RijMat, Rij_orig, R_orig, ErrVec)
-
-# sg = Uniform_Topology_SO3(200,0.5,0.3,0, crpt_type="uniform")

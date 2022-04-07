@@ -6,11 +6,11 @@ sys.path.append('../Models')
 from CEMP_SO3 import *
 from Uniform_Topology_SO3 import *
 
-model_out = Uniform_Topology_SO3(200, 0.5, 0.3, 0, "uniform")
-Ind = model_out.Ind; # matrix of edge indices (m by 2)
-RijMat = model_out.RijMat; # given corrupted and noisy relative rotations
-ErrVec = model_out.ErrVec; # ground truth corruption levels
-R_orig = model_out.R_orig; # ground truth rotations
+out = Uniform_Topology_SO3(200, 0.5, 0.3, 0.1, "uniform")
+Ind = out.Ind; # matrix of edge indices (m by 2)
+RijMat = out.RijMat; # given corrupted and noisy relative rotations
+ErrVec = out.ErrVec; # ground truth corruption levels
+R_orig = out.R_orig; # ground truth rotations
 
 # set CEMP defult parameters
 beta_init = 1
