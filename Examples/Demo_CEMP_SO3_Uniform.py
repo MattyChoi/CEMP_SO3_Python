@@ -6,7 +6,7 @@ sys.path.append('../Models')
 from CEMP_SO3 import *
 from Uniform_Topology_SO3 import *
 
-out = Uniform_Topology_SO3(200, 0.5, 0.3, 0.1, "uniform")
+out = Uniform_Topology_SO3(200, 0.5, 0.3, 0, "uniform")
 Ind = out.Ind; # matrix of edge indices (m by 2)
 RijMat = out.RijMat; # given corrupted and noisy relative rotations
 ErrVec = out.ErrVec; # ground truth corruption levels
