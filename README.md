@@ -22,7 +22,7 @@ to enter the folder containing the code. Then run
 ```
 pip install -r requirements.txt
 ```
-if you do not have all the necessary packages listed and then change the directory to the [Examples](https://github.com/MattyChoi/CEMP_SO3_Python/tree/main/Examples) folder
+if you do not have all the necessary packages listed. Then, change the directory to the [Examples](https://github.com/MattyChoi/CEMP_SO3_Python/tree/main/Examples) folder
 ```
 cd Examples
 ```
