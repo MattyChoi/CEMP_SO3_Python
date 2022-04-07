@@ -11,7 +11,7 @@ For other possible usages of CEMP, see repo (https://github.com/yunpeng-shi/MPLS
 
 ## Demo
 
-<img src="https://github.com/yunpeng-shi/CEMP/blob/main/scatter.jpg" width="500" height="400">
+<img src="https://github.com/MattyChoi/CEMP_SO3_Python/blob/main/cemp_demo.png" width="500" height="400">
 
 To run the code, you will need to install [git](https://git-scm.com/downloads) to clone this repository. In the terminal in your desired location, run the command
 ```
