@@ -14,7 +14,7 @@ To run the code, you will need to install [git](https://git-scm.com/downloads) t
 ```
 git clone https://github.com/MattyChoi/CEMP_SO3_Python.git
 ```
-to clone the repository. Then, change the directory to
+to clone the repository. Then, change the current directory using
 ```
 cd CEMP_SO3_Python
 ```
